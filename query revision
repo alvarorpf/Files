@@ -1,0 +1,246 @@
+select 
+	charge_id, 
+	code, 
+	student, 
+	parent, 
+	phone, 
+	cellphone, 
+	concept,
+	max(total) as total,
+	case 
+		when charge_id is not null then  max(amount_total)
+		else 0
+	end as amount_total,
+	max(amount_total- total) as rest,
+	max(payment_date)as payment_date,
+	max(date)as date,
+	year_id
+from
+                ((select
+                    c.id as charge_id,
+                    f.name as code,
+                    ('[' || coalesce(s.student_code, '') || ']' || ' ' || coalesce(s.full_name, '')) as student,
+                    ('[' || coalesce(f.name, '') || ']' || ' ' || coalesce(cc.name, '')) as parent,
+                    cc.phone as phone, 
+                    cc.cellphone as cellphone, 
+                    CASE
+                        
+                        WHEN t.concept_type = 'pension' THEN 'Pension'
+                        WHEN t.concept_type = 'material' THEN 'Material'
+                        WHEN t.concept_type = 'due' THEN 'Mora'
+                        
+                    END as concept,
+                    case
+                        when t.charge_type = 'payment' then c.amount_total
+                        when pays.charge_id is not null then pays.total
+                        else 0
+                    end as total,
+                    c.amount_total,
+                    pays.payment_date,
+                    c.date,
+                    c.year_id
+                from 
+                    account_op_charge c
+                    inner join product_product as p on c.product_id = p.id
+                    inner join product_template as t on p.product_tmpl_id = t.id
+                    inner join op_student as s on c.student_id=s.id
+                    inner join op_parent_contact as cc on s.payment_responsable = cc.id
+                    inner join op_family as f on s.family_code = f.id
+                    left join (
+                        
+                        select sum(total) as total, 
+                            charge_id,
+                            max(payment_date)as payment_date
+                            from
+                            (select 
+                                c.id as charge_id,
+                                f.name as code,
+                                ('[' || coalesce(s.student_code, '') || ']' || ' ' || coalesce(s.full_name, '')) as student,
+                                ('[' || coalesce(f.name, '') || ']' || ' ' || coalesce(cc.name, '')) as parent,
+                                cc.phone as phone, 
+                                cc.cellphone as cellphone, 
+                                CASE
+                                    WHEN t.concept_type = 'pension' THEN 'Pension'
+                                    WHEN t.concept_type = 'material' THEN 'Material'
+                                    WHEN t.concept_type = 'due' THEN 'Mora'
+                                END as concept,
+                                CASE
+                                    WHEN l.amount_pay is null THEN 0
+                                    else l.amount_pay
+                                END AS total,
+                                c.amount_total,
+                                ap.payment_date,
+                                c.date,
+                                c.year_id
+                            from 
+                                account_op_charge c
+                                left join op_request_pension_line l on c.id = l.charge_id
+                                left join op_request_charge r on r.id = l.request_id and r.state in ('partial', 'done')
+                                left join (
+                                    select
+                                        r.id,
+                                        max(payment_date) as payment_date,
+                                        sum(amount) as amount
+                                    from
+                                        op_request_charge r
+                                        left join account_payment ap on r.id = ap.charge_request_id
+                                    where
+                                        ap.payment_date <= '2019-11-30'
+                                    group by r.id
+                                ) as ap on ap.id = r.id
+                                inner join product_product as p on c.product_id = p.id
+                                inner join product_template as t on p.product_tmpl_id = t.id
+                                inner join op_student as s on c.student_id=s.id
+                                inner join op_parent_contact as cc on s.payment_responsable = cc.id
+                                inner join op_family as f on s.family_code = f.id
+                    where 
+                        c.state in ('wait','send', 'done') and r.state in ('partial', 'done')) as pays
+                    group by pays.charge_id
+                ) pays on pays.charge_id = c.id
+                where 
+                    c.state in ('wait','send', 'done')
+                order by charge_id)
+                UNION ALL
+                (SELECT 
+                    null as charge_id, 
+                    f.name as code, 
+                    null as student, 
+                    ('[' || coalesce(f.name, '') || ']' || ' ' || coalesce(max(cc.name), '')) as parent,
+                    max(cc.phone), 
+                    max(cc.cellphone), 
+                    'Pago Parcial' as concept,
+                    sum(aml.amount_currency * -1) as total,
+                    0 as  amount_total,
+                    -- ap.amount as rest,
+                    max(payment_date) as payment_date,
+                    max(rc.date) as date,
+                    max(rc.year_id)
+
+                FROM
+                    op_request_charge rc
+
+                    LEFT JOIN account_payment ap on rc.id = ap.charge_request_id 
+                    LEFT JOIN op_family as f on rc.code_family = f.id
+                    LEFT JOIN op_parent_contact as cc on rc.responsable_id = cc.id
+                    LEFT JOIN account_move_line aml on ap.id = aml.payment_id
+                    LEFT JOIN account_move am on am.id = aml.move_id
+                WHERE
+                    ap.charge_request_id is not null and rc.state = 'partial' and ap.payment_date <= '2019-11-30'
+                    and am.state = 'posted' and aml.account_id = 297
+                GROUP BY
+                    f.name)
+                ) as mora
+where 
+                date <= '2019-11-30' and code = '0125'
+            group by 
+                charge_id, 
+                code, 
+                student, 
+                parent, 
+                phone, 
+                cellphone, 
+                concept,
+                year_id
+order by year_id, date;
+
+select 
+                charge_id, 
+                code, 
+                student, 
+                parent, 
+                phone, 
+                cellphone, 
+                concept,
+                max(total) as total,
+                case 
+                    when charge_id is not null then  max(amount_total)
+                    else 0
+                end as amount_total,
+                max(amount_total- total) as rest,
+                max(payment_date)as payment_date,
+                max(date)as date,
+                year_id
+from
+                (select
+                    c.id as charge_id,
+                    f.name as code,
+                    ('[' || coalesce(s.student_code, '') || ']' || ' ' || coalesce(s.full_name, '')) as student,
+                    ('[' || coalesce(f.name, '') || ']' || ' ' || coalesce(cc.name, '')) as parent,
+                    cc.phone as phone, 
+                    cc.cellphone as cellphone, 
+                    CASE
+                        
+                        WHEN t.concept_type = 'pension' THEN 'Pension'
+                        WHEN t.concept_type = 'material' THEN 'Material'
+                        WHEN t.concept_type = 'due' THEN 'Mora'
+                        
+                    END as concept,
+                    case
+                        when t.charge_type = 'payment' then c.amount_total
+                        when pays.charge_id is not null then pays.total
+                        else 0
+                    end as total,
+                    c.amount_total,
+                    pays.payment_date,
+                    c.date,
+                    c.year_id
+                from 
+                    account_op_charge c
+                    inner join product_product as p on c.product_id = p.id
+                    inner join product_template as t on p.product_tmpl_id = t.id
+                    inner join op_student as s on c.student_id=s.id
+                    inner join op_parent_contact as cc on s.payment_responsable = cc.id
+                    inner join op_family as f on s.family_code = f.id
+                    left join (
+                        
+                         select sum(total) as total, 
+                            charge_id,
+                            max(payment_date)as payment_date
+                            from
+                            (select 
+                                c.id as charge_id,
+                                f.name as code,
+                                ('[' || coalesce(s.student_code, '') || ']' || ' ' || coalesce(s.full_name, '')) as student,
+                                ('[' || coalesce(f.name, '') || ']' || ' ' || coalesce(cc.name, '')) as parent,
+                                cc.phone as phone, 
+                                cc.cellphone as cellphone, 
+                                CASE
+                                    WHEN t.concept_type = 'pension' THEN 'Pension'
+                                    WHEN t.concept_type = 'material' THEN 'Material'
+                                    WHEN t.concept_type = 'due' THEN 'Mora'
+                                END as concept,
+                                l.amount_pay as total,
+                                c.amount_total,
+                                ap.payment_date,
+                                c.date,
+                                c.year_id
+                            from 
+                                account_op_charge c
+                                left join op_request_pension_line l on c.id = l.charge_id
+                                left join op_request_charge r on r.id = l.request_id and r.state in ('partial', 'done')
+                                left join account_payment ap on ap.id = r.payment_id
+                                inner join product_product as p on c.product_id = p.id
+                                inner join product_template as t on p.product_tmpl_id = t.id
+                                inner join op_student as s on c.student_id=s.id
+                                inner join op_parent_contact as cc on s.payment_responsable = cc.id
+                                inner join op_family as f on s.family_code = f.id
+                    where 
+                        c.state in ('wait','send', 'done') and ap.payment_date <= '2019-11-30' ) as pays
+                    group by pays.charge_id
+                ) pays on pays.charge_id = c.id
+                where 
+                    c.state in ('wait','send', 'done')
+                order by charge_id
+                ) as mora
+where 
+                date <= '2019-11-30' and code = '0125'
+group by 
+                charge_id, 
+                code, 
+                student, 
+                parent, 
+                phone, 
+                cellphone, 
+                concept,
+                year_id
+order by year_id, date;
