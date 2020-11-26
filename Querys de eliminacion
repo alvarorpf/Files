@@ -1,0 +1,62 @@
+delete 
+from op_request_pension_line 
+where request_id = 7198 and id not in (select 
+	max(id) as id
+from op_request_pension_line 
+where request_id = 7198 
+group by charge_id, request_id
+order by charge_id);
+
+delete 
+from op_request_pension_line 
+where request_id = 7203 and id not in (select 
+	max(id) as id
+from op_request_pension_line 
+where request_id = 7203 
+group by charge_id, request_id
+order by charge_id);
+
+delete 
+from op_request_pension_line 
+where request_id = 7222 and id not in (select 
+	max(id) as id
+from op_request_pension_line 
+where request_id = 7222 
+group by charge_id, request_id
+order by charge_id);
+
+delete 
+from op_request_pension_line 
+where request_id = 7280 and id not in (select 
+	max(id) as id
+from op_request_pension_line 
+where request_id = 7280 
+group by charge_id, request_id
+order by charge_id);
+
+delete 
+from op_request_pension_line 
+where request_id = 7283 and id not in (select 
+	max(id) as id
+from op_request_pension_line 
+where request_id = 7283 
+group by charge_id, request_id
+order by charge_id);
+
+delete 
+from op_request_pension_line 
+where request_id = 7311 and id not in (select 
+	max(id) as id
+from op_request_pension_line 
+where request_id = 7311 
+group by charge_id, request_id
+order by charge_id);
+
+delete 
+from op_request_pension_line 
+where request_id = 7478 and id not in (select 
+	max(id) as id
+from op_request_pension_line 
+where request_id = 7478 
+group by charge_id, request_id
+order by charge_id);
